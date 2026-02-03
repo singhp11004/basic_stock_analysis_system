@@ -1,0 +1,39 @@
+# ================================
+# STOCK ANALYSIS SYSTEM CONFIG
+# ================================
+
+# -------- DATA SETTINGS --------
+data:
+  symbol: "AAPL"
+  start_date: "2018-01-01"
+  end_date: "auto"
+
+  raw_data_path: "data/raw/stock_prices.csv"
+  processed_data_path: "data/processed/cleaned_data.csv"
+  features_data_path: "data/features/features.csv"
+
+
+# -------- TRADING SETTINGS --------
+trading:
+  initial_cash: 100000
+  transaction_cost: 0.001     # 0.1% per trade
+  max_position_size: 1         # 1 = fully invested, 0 = no position
+
+
+# -------- RL LEARNING PARAMETERS --------
+rl:
+  learning_rate: 0.1           # alpha
+  discount_factor: 0.95        # gamma
+
+  epsilon_start: 1.0
+  epsilon_min: 0.05
+  epsilon_decay: 0.995
+
+  episodes: 500
+
+
+# -------- MULTI-OBJECTIVE REWARD --------
+reward:
+  profit_weight: 1.0
+  drawdown_penalty: 0.5        # lambda
+  volatility_penalty: 0.2      # mu
