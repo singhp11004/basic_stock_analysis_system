@@ -1,0 +1,16 @@
+# Conda
+.env/
+.conda/
+
+# Python
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (optional)
+data/raw/*.csv
+
+# OS
+.DS_Store
