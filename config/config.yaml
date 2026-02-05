@@ -11,6 +11,11 @@ data:
   raw_data_path: "data/raw/stock_prices.csv"
   processed_data_path: "data/processed/cleaned_data.csv"
   features_data_path: "data/features/features.csv"
+  
+  # Train/Test Split (CRITICAL for realistic evaluation)
+  train_data_path: "data/features/train_features.csv"
+  test_data_path: "data/features/test_features.csv"
+  split_date: "2023-01-01"  # Train: before this date, Test: on/after this date
 
 
 # -------- TRADING SETTINGS --------
@@ -22,18 +27,26 @@ trading:
 
 # -------- RL LEARNING PARAMETERS --------
 rl:
-  learning_rate: 0.1           # alpha
-  discount_factor: 0.95        # gamma
+  learning_rate: 0.15            # alpha (increased for faster learning)
+  discount_factor: 0.99          # gamma (higher = more future-focused)
 
   epsilon_start: 1.0
-  epsilon_min: 0.05
-  epsilon_decay: 0.995
+  epsilon_min: 0.01              # lower min = more exploitation
+  epsilon_decay: 0.998           # slower decay = more exploration
 
-  episodes: 500
+  episodes: 1000                 # more training episodes
 
 
 # -------- MULTI-OBJECTIVE REWARD --------
 reward:
-  profit_weight: 1.0
-  drawdown_penalty: 0.5        # lambda
-  volatility_penalty: 0.2      # mu
+  profit_weight: 5.0             # AGGRESSIVE: strongly prioritize returns
+  drawdown_penalty: 0.01         # MINIMAL: allow aggressive risk-taking
+  volatility_penalty: 0.01       # MINIMAL: tolerate all volatility
+
+
+# -------- DQN HYPERPARAMETERS --------
+dqn:
+  learning_rate: 0.001
+  batch_size: 64
+  buffer_size: 10000
+  target_update_freq: 100      # Steps between target network updates

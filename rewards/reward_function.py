@@ -1,14 +1,14 @@
 """
 reward_function.py
 
-Implements a multi-objective reward function for stock trading using:
-- Profit
+Numerically stable, scale-invariant reward function for trading RL.
+
+Reward components:
+- Normalized profit (return)
 - Drawdown penalty
 - Volatility penalty
 
-Reward = profit_weight * profit
-         - drawdown_penalty * drawdown
-         - volatility_penalty * volatility
+This reward is SAFE for RL training.
 """
 
 import yaml
@@ -22,18 +22,6 @@ class RewardFunction:
     """
 
     def __init__(self, config_path: str, volatility_window: int = 20):
-        """
-        Initialize reward function using configuration file.
-
-        Parameters
-        ----------
-        config_path : str
-            Path to config.yaml
-        volatility_window : int
-            Window size for volatility calculation
-        """
-
-        # Load config
         with open(config_path, "r") as f:
             config = yaml.safe_load(f)
 
@@ -43,21 +31,10 @@ class RewardFunction:
         self.drawdown_penalty = reward_cfg["drawdown_penalty"]
         self.volatility_penalty = reward_cfg["volatility_penalty"]
 
-        # Track portfolio peak for drawdown calculation
         self.peak_portfolio_value = None
-
-        # Store recent returns for volatility calculation
         self.returns_window = deque(maxlen=volatility_window)
 
     def reset(self, initial_portfolio_value: float):
-        """
-        Reset reward state at the beginning of an episode.
-
-        Parameters
-        ----------
-        initial_portfolio_value : float
-            Starting portfolio value
-        """
         self.peak_portfolio_value = initial_portfolio_value
         self.returns_window.clear()
 
@@ -66,29 +43,15 @@ class RewardFunction:
         previous_portfolio_value: float,
         current_portfolio_value: float
     ) -> float:
-        """
-        Compute reward for one time step.
+        # -------- NORMALIZED PROFIT (RETURN) --------
+        if previous_portfolio_value <= 0:
+            step_return = 0.0
+        else:
+            step_return = (
+                current_portfolio_value - previous_portfolio_value
+            ) / previous_portfolio_value
 
-        Parameters
-        ----------
-        previous_portfolio_value : float
-            Portfolio value at time t-1
-        current_portfolio_value : float
-            Portfolio value at time t
-
-        Returns
-        -------
-        float
-            Scalar reward
-        """
-
-        # -------- PROFIT TERM --------
-        profit = current_portfolio_value - previous_portfolio_value
-
-        # -------- DRAWDOWN TERM --------
-        if self.peak_portfolio_value is None:
-            self.peak_portfolio_value = current_portfolio_value
-
+        # -------- DRAWDOWN --------
         self.peak_portfolio_value = max(
             self.peak_portfolio_value, current_portfolio_value
         )
@@ -98,10 +61,8 @@ class RewardFunction:
             / self.peak_portfolio_value
         )
 
-        # -------- VOLATILITY TERM --------
-        if previous_portfolio_value > 0:
-            step_return = profit / previous_portfolio_value
-            self.returns_window.append(step_return)
+        # -------- VOLATILITY --------
+        self.returns_window.append(step_return)
 
         volatility = (
             np.std(self.returns_window)
@@ -111,7 +72,7 @@ class RewardFunction:
 
         # -------- FINAL REWARD --------
         reward = (
-            self.profit_weight * profit
+            self.profit_weight * step_return
             - self.drawdown_penalty * drawdown
             - self.volatility_penalty * volatility
         )

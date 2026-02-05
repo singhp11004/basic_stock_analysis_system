@@ -2,8 +2,12 @@
 trading_env.py
 
 Final trading environment for reinforcement learning.
-Implements correct portfolio accounting and integrates
-the multi-objective reward function.
+Implements correct single-stock portfolio accounting
+with no leverage, no short selling, and transaction costs.
+
+CRITICAL DESIGN:
+- Uses NORMALIZED features for state representation (better generalization)
+- Uses REAL prices for portfolio valuation (financially meaningful)
 """
 
 import pandas as pd
@@ -16,17 +20,26 @@ from rewards.reward_function import RewardFunction
 class TradingEnv:
     """
     Single-stock trading environment with:
-    - Discrete actions
-    - Binary position
-    - Transaction costs
+    - Discrete actions (HOLD, BUY, SELL)
+    - Binary position (0 = no stock, 1 = fully invested)
+    - No leverage, no short selling
+    
+    State: Normalized features (for generalization)
+    Pricing: Real Adj Close (for correct portfolio valuation)
     """
 
-    # Action definitions
     HOLD = 0
     BUY = 1
     SELL = 2
 
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str, data_path: str = None, prices_path: str = None):
+        """
+        Args:
+            config_path: Path to config.yaml
+            data_path: Path to normalized features (for state)
+            prices_path: Path to raw features with real prices (for trading)
+                         If None, uses data_path (assumes prices in features)
+        """
         # -------- LOAD CONFIG --------
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
@@ -34,9 +47,24 @@ class TradingEnv:
         data_cfg = self.config["data"]
         trading_cfg = self.config["trading"]
 
-        # Load feature data
-        self.data = pd.read_csv(data_cfg["features_data_path"])
+        # Load normalized feature data (for state representation)
+        features_path = data_path if data_path else data_cfg["features_data_path"]
+        self.data = pd.read_csv(features_path)
         self.data.reset_index(drop=True, inplace=True)
+        
+        # Load real price data (for portfolio valuation)
+        if prices_path:
+            self.prices_data = pd.read_csv(prices_path)
+            self.prices_data.reset_index(drop=True, inplace=True)
+        else:
+            # If using normalized data, infer prices path from features path
+            if "_normalized" in features_path:
+                inferred_prices_path = features_path.replace("_normalized", "")
+                self.prices_data = pd.read_csv(inferred_prices_path)
+                self.prices_data.reset_index(drop=True, inplace=True)
+            else:
+                # Same file contains real prices
+                self.prices_data = self.data
 
         # Trading parameters
         self.initial_cash = trading_cfg["initial_cash"]
@@ -48,7 +76,8 @@ class TradingEnv:
         # Environment state
         self.current_step = 0
         self.cash = None
-        self.position = None          # number of shares held
+        self.shares = None
+        self.position = None           # 0 or 1
         self.portfolio_value = None
         self.prev_portfolio_value = None
 
@@ -58,12 +87,12 @@ class TradingEnv:
         """
         self.current_step = 0
         self.cash = self.initial_cash
-        self.position = 0.0
+        self.shares = 0.0
+        self.position = 0
 
         self.portfolio_value = self.initial_cash
         self.prev_portfolio_value = self.portfolio_value
 
-        # Reset reward tracking
         self.reward_fn.reset(self.portfolio_value)
 
         return self._get_state()
@@ -78,29 +107,32 @@ class TradingEnv:
         2 = SELL
         """
         done = False
-        price = self.data.loc[self.current_step, "Close"]
+        
+        # Use REAL price for trading (from prices_data, not normalized data)
+        price = self.prices_data.loc[self.current_step, "Adj Close"]
 
         # -------- EXECUTE ACTION --------
         if action == self.BUY and self.position == 0:
-            # Invest all cash
-            shares = self.cash / price
-            cost = self.cash * self.transaction_cost
+            # Buy with all cash (apply transaction cost)
+            effective_cash = self.cash * (1 - self.transaction_cost)
+            self.shares = effective_cash / price
+            self.cash = 0.0
+            self.position = 1
 
-            self.position = shares
-            self.cash = -cost  # cash fully invested + transaction cost
-
-        elif action == self.SELL and self.position > 0:
-            # Sell all shares
-            proceeds = self.position * price
-            cost = proceeds * self.transaction_cost
-
-            self.cash = proceeds - cost
-            self.position = 0.0
+        elif action == self.SELL and self.position == 1:
+            # Sell all shares (apply transaction cost)
+            proceeds = self.shares * price
+            self.cash = proceeds * (1 - self.transaction_cost)
+            self.shares = 0.0
+            self.position = 0
 
         # -------- UPDATE PORTFOLIO VALUE --------
         self.prev_portfolio_value = self.portfolio_value
 
-        self.portfolio_value = self.cash + self.position * price
+        if self.position == 1:
+            self.portfolio_value = self.shares * price
+        else:
+            self.portfolio_value = self.cash
 
         # -------- COMPUTE REWARD --------
         reward = self.reward_fn.compute_reward(
@@ -114,24 +146,18 @@ class TradingEnv:
             done = True
 
         next_state = self._get_state()
-
         return next_state, reward, done
 
     def _get_state(self):
         """
-        Construct state vector:
+        Construct state vector from NORMALIZED features:
         [market features..., position_flag]
         """
         row = self.data.loc[self.current_step]
 
-        # Market features (exclude Date)
+        # Market features (exclude Date) - these are normalized
         features = row.drop("Date").values.astype(np.float32)
 
-        # Position flag (0 or 1)
-        position_flag = np.array(
-            [1.0 if self.position > 0 else 0.0],
-            dtype=np.float32
-        )
+        position_flag = np.array([float(self.position)], dtype=np.float32)
 
-        state = np.concatenate([features, position_flag])
-        return state
+        return np.concatenate([features, position_flag])
