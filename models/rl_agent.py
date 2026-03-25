@@ -78,7 +78,7 @@ class RLAgent:
         # Q-table: maps state -> action values
         self.q_table = defaultdict(lambda: np.zeros(self.n_actions))
 
-    def _discretize_state(self, state, n_bins=20):
+    def _discretize_state(self, state, n_bins=10):
         """
         Convert continuous state into a discrete representation
         usable as a dictionary key.
