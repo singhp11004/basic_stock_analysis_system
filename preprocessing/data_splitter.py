@@ -22,7 +22,7 @@ def split_data(config_path: str = "config/config.yaml"):
     
     data_cfg = config["data"]
     
-    features_path = data_cfg["features_data_path"]
+    features_path = data_cfg.get("ml_features_data_path", data_cfg["features_data_path"])
     train_path = data_cfg["train_data_path"]
     test_path = data_cfg["test_data_path"]
     split_date = data_cfg["split_date"]

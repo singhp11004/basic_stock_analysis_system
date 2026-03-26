@@ -11,6 +11,7 @@ data:
   raw_data_path: "data/raw/stock_prices.csv"
   processed_data_path: "data/processed/cleaned_data.csv"
   features_data_path: "data/features/features.csv"
+  ml_features_data_path: "data/features/features_with_ml.csv"
   
   # Train/Test Split (CRITICAL for realistic evaluation)
   train_data_path: "data/features/train_features.csv"
@@ -44,9 +45,12 @@ reward:
   volatility_penalty: 0.01       # MINIMAL: tolerate all volatility
 
 
-# -------- DQN HYPERPARAMETERS --------
-dqn:
-  learning_rate: 0.001
+# -------- SB3 PPO HYPERPARAMETERS --------
+sb3:
+  learning_rate: 0.0003
+  n_steps: 2048
   batch_size: 64
-  buffer_size: 10000
-  target_update_freq: 100      # Steps between target network updates
+  n_epochs: 10
+  gamma: 0.99
+  ent_coef: 0.01
+  total_timesteps: 500000

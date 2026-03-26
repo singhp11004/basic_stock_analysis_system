@@ -44,12 +44,19 @@ def fetch_stock_data(symbol, start_date, end_date, output_path):
 
 
 if __name__ == "__main__":
-    SYMBOL = "AAPL"
-    START_DATE = "2018-01-01"
-
-    # 🔒 Avoid 'today' edge case (use yesterday)
-    END_DATE = (datetime.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-
-    OUTPUT_FILE = "data/raw/stock_prices.csv"
+    import yaml
+    with open("config/config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+    
+    data_cfg = config["data"]
+    SYMBOL = data_cfg["symbol"]
+    START_DATE = data_cfg["start_date"]
+    
+    if data_cfg["end_date"] == "auto":
+        END_DATE = (datetime.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+    else:
+        END_DATE = data_cfg["end_date"]
+        
+    OUTPUT_FILE = data_cfg["raw_data_path"]
 
     fetch_stock_data(SYMBOL, START_DATE, END_DATE, OUTPUT_FILE)

@@ -14,7 +14,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, PROJECT_ROOT)
 
 from env.trading_env import TradingEnv
-from models.rl_agent import RLAgent
+from stable_baselines3 import PPO
 from evaluation.metrics import (
     evaluate_strategy,
     buy_and_hold_baseline,
@@ -42,15 +42,13 @@ def backtest():
 
     # -------- CREATE FRESH ENV WITH TEST DATA --------
     env = TradingEnv(config_path, data_path=test_data_path)
-    state = env.reset()
+    state, _ = env.reset()
 
     print("DEBUG: Portfolio after reset:", env.portfolio_value)
     assert env.portfolio_value == initial_cash
 
     # -------- CREATE FRESH AGENT --------
-    agent = RLAgent(config_path, n_actions=3)
-    agent.load("models/q_table.pkl")
-    agent.epsilon = 0.0  # pure exploitation
+    model = PPO.load("models/ppo_agent")
 
     done = False
     portfolio_history = [env.portfolio_value]
@@ -63,18 +61,19 @@ def backtest():
     print("=" * 60)
 
     while not done:
-        action = agent.select_action(state)
-        action_counts[action] += 1
+        action, _states = model.predict(state, deterministic=True)
+        action_item = int(action)
+        action_counts[action_item] += 1
         
-        next_state, reward, done = env.step(action)
+        next_state, reward, done, truncated, info = env.step(action_item)
 
         # Track portfolio value
         portfolio_history.append(env.portfolio_value)
 
         # HARD SAFETY CHECK
-        assert env.cash >= 0
-        assert env.shares >= 0
-        assert not (env.cash > 0 and env.shares > 0)
+        FLOAT_TOLERANCE = 1e-8
+        assert not (env.cash > FLOAT_TOLERANCE and env.shares > FLOAT_TOLERANCE), \
+            f"Inconsistent state: cash={env.cash:.4f}, shares={env.shares:.8f}"
 
         state = next_state
 

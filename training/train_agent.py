@@ -9,14 +9,17 @@ CRITICAL: Uses TRAIN data only to prevent overfitting.
 import os
 import sys
 
+import os
+import sys
+import yaml
+
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-import yaml
 from env.trading_env import TradingEnv
-from models.rl_agent import RLAgent
-
+from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import DummyVecEnv
 
 def train():
     config_path = "config/config.yaml"
@@ -25,49 +28,42 @@ def train():
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
-    episodes = config["rl"]["episodes"]
-    
     # Use NORMALIZED training data for better generalization
     train_data_path = config["data"]["train_data_path"].replace(".csv", "_normalized.csv")
 
     # Initialize environment with TRAINING DATA ONLY
-    env = TradingEnv(config_path, data_path=train_data_path)
-    agent = RLAgent(config_path, n_actions=3)
+    # SB3 requires vectorized environments, DummyVecEnv is easiest wrapper
+    env = DummyVecEnv([lambda: TradingEnv(config_path, data_path=train_data_path)])
+
+    sb3_cfg = config["sb3"]
 
     print("=" * 60)
-    print("PHASE 4: RL TRAINING STARTED (TRAIN DATA ONLY)")
+    print("PHASE 4: RL TRAINING STARTED (PPO SB3)")
     print(f"Training data: {train_data_path}")
-    print(f"Total episodes: {episodes}")
-    print(f"Training samples: {len(env.data)}")
+    print(f"Total timesteps: {sb3_cfg['total_timesteps']}")
     print("=" * 60)
 
-    for episode in range(episodes):
-        state = env.reset()
-        done = False
-        total_reward = 0.0
-        steps = 0
+    model = PPO(
+        "MlpPolicy",
+        env,
+        learning_rate=sb3_cfg["learning_rate"],
+        n_steps=sb3_cfg["n_steps"],
+        batch_size=sb3_cfg["batch_size"],
+        n_epochs=sb3_cfg["n_epochs"],
+        gamma=sb3_cfg["gamma"],
+        ent_coef=sb3_cfg["ent_coef"],
+        verbose=1
+    )
 
-        while not done:
-            action = agent.select_action(state)
-            next_state, reward, done = env.step(action)
-            agent.update(state, action, reward, next_state, done)
-
-            state = next_state
-            total_reward += reward
-            steps += 1
-
-        print(
-            f"Episode {episode + 1}/{episodes} | "
-            f"Steps: {steps} | "
-            f"Total Reward: {total_reward:.2f} | "
-            f"Epsilon: {agent.epsilon:.4f}"
-        )
+    model.learn(total_timesteps=sb3_cfg["total_timesteps"])
 
     print("=" * 60)
     print("TRAINING COMPLETE")
     print("=" * 60)
-    agent.save("models/q_table.pkl")
-    print("Q-table saved to models/q_table.pkl")
+    
+    os.makedirs("models", exist_ok=True)
+    model.save("models/ppo_agent")
+    print("Model saved to models/ppo_agent.zip")
 
 
 if __name__ == "__main__":

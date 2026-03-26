@@ -32,6 +32,7 @@ def generate_ml_signals(config_path="config/config.yaml"):
     
     split_date = config["data"]["split_date"]
     features_path = config["data"]["features_data_path"]
+    ml_features_path = config["data"]["ml_features_data_path"]
     
     # Load full feature data
     df = pd.read_csv(features_path)
@@ -96,9 +97,9 @@ def generate_ml_signals(config_path="config/config.yaml"):
     # Remove target column (it was only for training)
     df_for_pred.drop(columns=["Target"], inplace=True)
     
-    # Save to features file
-    df_for_pred.to_csv(features_path, index=False)
-    print(f"Updated features saved to {features_path}")
+    # Save to ML features file
+    df_for_pred.to_csv(ml_features_path, index=False)
+    print(f"Updated features saved to {ml_features_path}")
     
     # ============ SAVE MODEL AND SCALER ============
     os.makedirs("models", exist_ok=True)

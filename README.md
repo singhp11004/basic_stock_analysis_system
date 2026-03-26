@@ -8,14 +8,15 @@ The problem is to design an **adaptive, data-driven trading system** that learns
 
 ## Project Overview
 
-This project implements an end-to-end Reinforcement Learning (RL) pipeline for algorithmic stock trading. It uses a **Tabular Q-Learning Agent** to navigate a custom OpenAI Gym-like single-stock trading environment. 
+This project implements an end-to-end Reinforcement Learning (RL) pipeline for algorithmic stock trading. It has recently been upgraded from a Tabular Q-Learning approach to a **Research-Grade Deep Reinforcement Learning Agent (PPO)** using the **Stable-Baselines3** framework.
 
 The system features a rigorous data pipeline that prevents data leakage by explicitly separating training and testing data temporally. It normalizes features using statistics strictly from the training set and uses real prices for accurate portfolio valuation during backtesting.
 
 ## Key Features
 
-- **RL Trading Agent**: A Tabular Q-learning agent with an epsilon-greedy exploration strategy.
-- **Custom Trading Environment**: Simulates realistic trading with transaction costs, binary positions (fully invested or uninvested), and no short-selling/leverage.
+- **Advanced RL Trading Agent**: Utilizes Proximal Policy Optimization (PPO) via Stable-Baselines3 for stable and scalable learning.
+- **Vectorized Trading Environment**: Custom OpenAI Gym/Gymnasium-compatible environment wrapped in `DummyVecEnv` for high-performance training.
+- **Automated Pipeline Configuration**: Full integration with `config/config.yaml` for data fetching, trading parameters, and RL hyperparameters.
 - **Robust Feature Engineering**: 
   - *Technical Indicators*: Moving averages, RSI, MACD, Bollinger Bands, momentum.
   - *Machine Learning Signals*: Random Forest classifier predictions to forecast next-day positive returns.

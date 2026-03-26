@@ -13,11 +13,13 @@ CRITICAL DESIGN:
 import pandas as pd
 import numpy as np
 import yaml
+import gymnasium as gym
+from gymnasium import spaces
 
 from rewards.reward_function import RewardFunction
 
 
-class TradingEnv:
+class TradingEnv(gym.Env):
     """
     Single-stock trading environment with:
     - Discrete actions (HOLD, BUY, SELL)
@@ -75,16 +77,22 @@ class TradingEnv:
 
         # Environment state
         self.current_step = 0
-        self.cash = None
-        self.shares = None
-        self.position = None           # 0 or 1
-        self.portfolio_value = None
-        self.prev_portfolio_value = None
+        self.cash = self.initial_cash
+        self.shares = 0.0
+        self.position = 0
+        self.portfolio_value = self.initial_cash
+        self.prev_portfolio_value = self.initial_cash
+        
+        # SB3 Gymnasium Spaces Action and Observation space
+        self.action_space = spaces.Discrete(3)
+        obs = self._get_state()
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=obs.shape, dtype=np.float32)
 
-    def reset(self):
+    def reset(self, seed=None, options=None):
         """
         Reset environment to the beginning of the episode.
         """
+        super().reset(seed=seed)
         self.current_step = 0
         self.cash = self.initial_cash
         self.shares = 0.0
@@ -95,7 +103,7 @@ class TradingEnv:
 
         self.reward_fn.reset(self.portfolio_value)
 
-        return self._get_state()
+        return self._get_state(), {}
 
     def step(self, action: int):
         """
@@ -146,7 +154,7 @@ class TradingEnv:
             done = True
 
         next_state = self._get_state()
-        return next_state, reward, done
+        return next_state, float(reward), done, False, {}
 
     def _get_state(self):
         """
@@ -155,8 +163,10 @@ class TradingEnv:
         """
         row = self.data.loc[self.current_step]
 
-        # Market features (exclude Date) - these are normalized
-        features = row.drop("Date").values.astype(np.float32)
+        # Market features (exclude Date and raw prices to prevent leakage)
+        drop_cols = ["Date", "Open", "High", "Low", "Close", "Adj Close", "Volume"]
+        cols_to_drop = [c for c in drop_cols if c in row.index]
+        features = row.drop(labels=cols_to_drop).values.astype(np.float32)
 
         position_flag = np.array([float(self.position)], dtype=np.float32)
 

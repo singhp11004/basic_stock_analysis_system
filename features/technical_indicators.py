@@ -85,10 +85,8 @@ def compute_features(input_path, output_path):
     # Drop rows with NaNs from rolling windows
     df.dropna(inplace=True)
 
-    # CRITICAL: Remove Close column to prevent state leakage
-    # Agent must only see Adj Close-based features
-    if "Close" in df.columns:
-        df.drop(columns=["Close"], inplace=True)
+    # We KEEP raw price columns here because TradingEnv needs them for portfolio valuation.
+    # They will be explicitly dropped from the state representation in TradingEnv._get_state()
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df.to_csv(output_path, index=False)
